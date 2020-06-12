@@ -35,7 +35,7 @@ static int create_listener(const char *path) {
   local.sun_path[sizeof(local.sun_path) - 1] = '\0';
 
   if (strcmp(local.sun_path, path)) {
-    fprintf(stderr, "path too long");
+    fprintf(stderr, "path too long\n");
     return -1;
   }
 
