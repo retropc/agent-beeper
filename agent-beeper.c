@@ -285,8 +285,11 @@ int main(int argc, char *argv[]) {
   const char *listen_path = argv[1];
   const char *agent_path = argv[2];
 
-  if (signal(SIGCHLD, SIG_IGN) == SIG_ERR) {
-    perror("signal");
+  struct sigaction sa = { 0 };
+  sa.sa_handler = SIG_IGN;
+  sa.sa_flags = SA_NOCLDSTOP|SA_NOCLDWAIT|SA_RESTART;
+  if (sigaction(SIGCHLD, &sa, NULL) == -1) {
+    perror("sigaction");
     return 1;
   }
 
@@ -313,6 +316,9 @@ int main(int argc, char *argv[]) {
     struct epoll_event events[50];
     int count = epoll_wait(epfd, events, 50, -1);
     if (count == -1) {
+      if (errno == EINTR) {
+        continue;
+      }
       perror("epoll_wait");
       break;
     }
