@@ -133,21 +133,20 @@ static int pump(int src, int dst) {
     return 0;
   }
 
-  ssize_t r2 = send(dst, buf, r, MSG_NOSIGNAL);
-  if (r2 == -1) {
-    if (errno == EAGAIN || errno == EWOULDBLOCK) {
-      return 1;
+  ssize_t pos = 0;
+  while (r > 0) {
+    ssize_t r2 = send(dst, buf + pos, r, MSG_NOSIGNAL);
+    if (r2 == -1) {
+      /* no buffer */
+      perror("write");
+      return -1;
     }
-    perror("write");
-    return -1;
-  }
-  if (r2 == 0) {
-    fprintf(stderr, "send: EOF\n");
-    return 0;
-  }
-  if (r != r2) {
-    fprintf(stderr, "send: short write\n");
-    return -1;
+    if (r2 == 0) {
+      fprintf(stderr, "send: EOF\n");
+      return 0;
+    }
+    pos+=r2;
+    r-=r2;
   }
 
   return 1;
