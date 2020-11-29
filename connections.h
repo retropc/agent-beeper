@@ -18,6 +18,7 @@ struct socket_connection {
 struct connection {
   struct socket_connection socket, agent;
   int connected;
+  pid_t pid;
   int epfd;
   struct connection *next_free;
 };

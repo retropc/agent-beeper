@@ -58,7 +58,7 @@ static int create_listener(const char *path) {
   return fd;
 }
 
-static int exec_beep(void) {
+static int exec_beep(struct connection *c) {
   int devnull = open("/dev/null", O_RDWR|O_CLOEXEC);
   if (devnull == -1) {
     perror("open");
@@ -72,14 +72,18 @@ static int exec_beep(void) {
     return 1;
   }
 
+  char pidstr[50];
+  snprintf(pidstr, sizeof(pidstr), "%d", c->pid);
+  setenv("SSH_CONN_PID", pidstr, 1);
+
   /* argv[argc] == NULL by ansi standard */
   execvp(program_args[0], program_args);
 
-  perror("execlp");
+  perror("execvp");
   return 1;
 }
 
-static int beep(void) {
+static int beep(struct connection *c) {
   pid_t p = fork();
   if (p == -1) {
     perror("fork");
@@ -91,7 +95,7 @@ static int beep(void) {
   }
 
   /* child */
-  _exit(exec_beep());
+  _exit(exec_beep(c));
 }
 
 static int connect_agent(const char *path, int *fd_out) {
@@ -230,6 +234,27 @@ static void handle_listener(int s, int epfd, const char *agent_path) {
     return;
   }
 
+  {
+    struct ucred ucred;
+    unsigned int len = sizeof(struct ucred);
+
+    if (getsockopt(s2, SOL_SOCKET, SO_PEERCRED, &ucred, &len) == -1) {
+      fprintf(stderr, "unable to lookup peer credentials\n");
+      close(s2);
+      free_connection(c);
+      return;
+    }
+
+    if (ucred.uid != getuid()) {
+      fprintf(stderr, "denied: connecting process owned by other user, uid: %d\n", ucred.uid);
+      close(s2);
+      free_connection(c);
+      return;
+    }
+
+    c->pid = ucred.pid;
+  }
+
   int s3;
   int r = connect_agent(agent_path, &s3);
   if (r == -1) {
@@ -273,7 +298,7 @@ static void handle_listener(int s, int epfd, const char *agent_path) {
     return;
   }
 
-  if (!beep()) {
+  if (!beep(c)) {
     close_connection(c);
     return;
   }
