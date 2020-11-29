@@ -15,6 +15,8 @@
 #include <errno.h>
 #include "connections.h"
 
+static char **program_args;
+
 static int create_listener(const char *path) {
   struct sockaddr_un local = { 0 };
 
@@ -70,8 +72,9 @@ static int exec_beep(void) {
     return 1;
   }
 
-  execlp("beep", "beep", "-f", "800", "-d", "50", "-r", "3", NULL);
-//  execlp("sleep", "sleep", "50", NULL);
+  /* argv[argc] == NULL by ansi standard */
+  execvp(program_args[0], program_args);
+
   perror("execlp");
   return 1;
 }
@@ -276,14 +279,15 @@ static void handle_listener(int s, int epfd, const char *agent_path) {
   }
 }
 
-int main(int argc, char *argv[]) {
-  if (argc < 3) {
-    fprintf(stderr, "args: %s [listen path] [agent path]\n", argv[0]);
+int main(int argc, char **argv) {
+  if (argc < 4) {
+    fprintf(stderr, "args: %s [listen path] [agent path] [program to run] ?arg1? ?arg2? ... ?argn?\n", argv[0]);
     return 1;
   }
 
   const char *listen_path = argv[1];
   const char *agent_path = argv[2];
+  program_args = &argv[3];
 
   struct sigaction sa = { 0 };
   sa.sa_handler = SIG_IGN;
